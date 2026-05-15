@@ -124,6 +124,58 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .sum-acc-arr{font-size:18px;color:var(--muted);transition:transform .2s;flex-shrink:0}
 details[open] .sum-acc-arr{transform:rotate(90deg)}
 .sum-acc-body{padding:0 14px 14px;font-size:13px;line-height:1.7;border-top:1px solid var(--border)}
+
+/* ── TIMETABLE ── */
+.tt-section{margin-bottom:20px}
+.tt-day-hd{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px;display:flex;align-items:center;gap:6px}
+.tt-day-hd.today-hd{color:var(--acc)}
+.tt-today-badge{background:var(--acc);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.3px}
+.tt-item{border-radius:10px;padding:10px 12px;margin-bottom:5px;display:flex;align-items:flex-start;gap:10px;cursor:default}
+.tt-item.clickable{cursor:pointer}
+.tt-item.clickable:active{opacity:.75}
+.tt-item.revision{background:#E8F5F0;border-left:3px solid #1D9E75}
+.tt-item.break{background:#F3F4F6;border-left:3px solid #9CA3AF}
+.tt-item.meal{background:#FEF9C3;border-left:3px solid #CA8A04}
+.tt-item.free{background:#EDE9FE;border-left:3px solid #7C3AED}
+.tt-item.exam{background:#FEE2E2;border-left:3px solid #DC2626}
+.tt-item.rest{background:#F0F9FF;border-left:3px solid #0EA5E9}
+@media(prefers-color-scheme:dark){
+  .tt-item.revision{background:#0A2E22;border-left-color:#1D9E75}
+  .tt-item.break{background:#1F2937;border-left-color:#6B7280}
+  .tt-item.meal{background:#2D2400;border-left-color:#CA8A04}
+  .tt-item.free{background:#1E1635;border-left-color:#7C3AED}
+  .tt-item.exam{background:#2D0A0A;border-left-color:#DC2626}
+  .tt-item.rest{background:#0A1929;border-left-color:#0EA5E9}
+}
+.tt-time{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;min-width:40px;margin-top:2px}
+.tt-content{flex:1}
+.tt-title{font-size:13px;font-weight:600;line-height:1.3;margin-bottom:2px}
+.tt-item.revision .tt-title{color:#085041}
+.tt-item.meal .tt-title{color:#854D0E}
+.tt-item.free .tt-title{color:#5B21B6}
+.tt-item.exam .tt-title{color:#991B1B;font-size:14px}
+.tt-item.rest .tt-title{color:#0369A1}
+@media(prefers-color-scheme:dark){
+  .tt-item.revision .tt-title{color:#6EE7B7}
+  .tt-item.meal .tt-title{color:#FCD34D}
+  .tt-item.free .tt-title{color:#C4B5FD}
+  .tt-item.exam .tt-title{color:#FCA5A5}
+  .tt-item.rest .tt-title{color:#7DD3FC}
+}
+.tt-desc{font-size:11px;color:var(--muted);line-height:1.4}
+.tt-go{font-size:10px;font-weight:700;color:var(--acc);margin-top:3px}
+.tt-now{position:relative}
+.tt-now-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--acc);margin-right:4px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.tt-legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tt-leg{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:var(--muted)}
+.tt-leg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.tt-leg-dot.revision{background:#1D9E75}
+.tt-leg-dot.break{background:#9CA3AF}
+.tt-leg-dot.meal{background:#CA8A04}
+.tt-leg-dot.free{background:#7C3AED}
+.tt-leg-dot.exam{background:#DC2626}
+.tt-leg-dot.rest{background:#0EA5E9}
 </style>
 </head>
 <body>
@@ -172,7 +224,18 @@ details[open] .sum-acc-arr{transform:rotate(90deg)}
       <div class="lbl">days until your exam</div>
       <div class="dt" id="exam-dt"></div>
     </div>
-    <div class="slbl">Pick a topic</div>
+    <div id="today-section" style="margin-bottom:6px"></div>
+    <div class="slbl">Revision Schedule</div>
+    <div class="tt-legend">
+      <div class="tt-leg"><div class="tt-leg-dot revision"></div>Revision</div>
+      <div class="tt-leg"><div class="tt-leg-dot break"></div>Break</div>
+      <div class="tt-leg"><div class="tt-leg-dot meal"></div>Food</div>
+      <div class="tt-leg"><div class="tt-leg-dot free"></div>Free time</div>
+      <div class="tt-leg"><div class="tt-leg-dot rest"></div>Rest</div>
+      <div class="tt-leg"><div class="tt-leg-dot exam"></div>Exam</div>
+    </div>
+    <div id="tt-body"></div>
+    <div class="slbl" style="margin-top:16px">Topics</div>
     <div class="grid" id="g-home"></div>
   </div>
 
@@ -1544,6 +1607,7 @@ function chooseModule(mod) {
   // Reset all pickers and sessions
   resetApp();
   buildGrids();
+  buildTimetable();
 }
 
 function goHome() {
@@ -1890,6 +1954,128 @@ function startMix() {
   DATA['MIX'] = { _shuffled: all.sort(() => Math.random() - 0.5) };
   fcIdx = 0;
   renderFC();
+}
+
+
+// ── TIMETABLE DATA ────────────────────────────────────────────────────────────
+const TIMETABLE = {
+  eco: [
+    ["13 May",[["09:30","11:00","revision","Read All Summaries (Part 1)","all","First 10 topics — big picture only"],["11:00","11:30","break","Break",null,"Fresh air!"],["11:30","13:00","revision","Read All Summaries (Part 2)","all","Remaining 10 topics"],["13:00","14:00","meal","Lunch",null,"Step away from the desk"],["14:00","15:30","revision","All Topics Quiz","qz","Find your weakest topics"],["15:30","16:30","break","Afternoon Break",null,"Walk, snack, recharge"],["16:30","18:30","revision","Key Terms: All Topics","tr","Note any you're not confident on"],["18:30","19:30","meal","Dinner",null,"Relax properly"],["19:30","21:00","revision","Flashcards: Weak Topics","fc","Focus on what you flagged"]]],
+    ["14 May",[["09:30","11:00","revision","Carbon Cycling & Water Balance","fc","1.2.1 + 1.3.1 — summary, flashcards, quiz"],["11:00","11:30","break","Break",null,"Get some air!"],["11:30","13:00","revision","Biodiversity I & II","fc","1.5.1 + 1.7.1 — summary, flashcards, quiz"],["13:00","14:00","meal","Lunch",null,"Proper lunch!"],["14:00","16:00","revision","Soil Processes I, II & III","fc","1.8.1, 1.9.1, 1.10.1 — heavy content, summaries first"],["16:00","17:00","break","Afternoon Break",null,"Go outside if you can"],["17:00","18:30","revision","Temporal Dynamics & Ecosystems Intro","fc","1.1.1 + 1.4.1 — summary + flashcards"],["18:30","19:30","meal","Dinner",null,"Dinner time!"],["19:30","21:00","revision","Quiz: Carbon, Biodiversity & Soils","qz","Test yourself on today's topics"]]],
+    ["15 May",[["09:30","11:00","revision","Watershed & Marine Ecosystems","fc","1.11.1 + 2.1.1 — summary, flashcards, quiz"],["11:00","11:30","break","Break",null,"Short break!"],["11:30","13:00","revision","Deep Sea Mining & River Ecosystems I","fc","2.2.1 + 2.3.1 — summary, flashcards, quiz"],["13:00","14:00","meal","Lunch",null,"Proper lunch!"],["14:00","16:00","revision","River Water Quality & River Functioning","fc","2.4.1 + 2.5.1 — summary, flashcards, quiz"],["16:00","17:00","break","Afternoon Break",null,"Rest!"],["17:00","18:30","revision","Terrestrial-Aquatic, Forests & Grasslands","fc","2.6.1, 2.7.1, 2.8.1 — summaries + flashcards"],["18:30","19:30","meal","Dinner",null,"Dinner time!"],["19:30","21:00","revision","Global Change I & II","fc","2.10.1 + 2.11.1 — summary, flashcards, quiz"]]],
+    ["16 May",[["09:30","11:00","revision","Full Shuffle Flashcards","fc","All Topics — note any you stumble on"],["11:00","11:30","break","Break",null,"Short break!"],["11:30","13:00","revision","Full All Topics Quiz","qz","Note your scores and weak spots"],["13:00","14:00","meal","Lunch",null,"Proper lunch!"],["14:00","16:30","revision","Targeted Weak Topics","fc","Summaries + flashcards on what you got wrong"],["16:30","17:30","break","Afternoon Break",null,"Rest and recharge!"],["17:30","18:30","revision","Key Terms Consolidation","tr","All Topics key terms — cover shaky ones"],["18:30","19:30","meal","Dinner",null,"Dinner!"],["19:30","21:00","revision","Evening Flashcard Shuffle","fc","Relaxed All Topics run to end the day"]]],
+    ["17 May",[["09:30","11:00","revision","Full Shuffle Flashcards","fc","Note topics you stumble on — targets for today"],["11:00","11:30","break","Break",null,"Short break!"],["11:30","13:00","revision","Targeted Summaries","sm","Re-read summaries for weak topics"],["13:00","14:00","meal","Lunch",null,"Proper lunch!"],["14:00","16:00","revision","Targeted Quiz: Weak Topics","qz","Quiz specifically on your weakest topics"],["16:00","17:00","break","Afternoon Break",null,"Rest!"],["17:00","18:30","revision","Custom Mix: Weak Topics","fc","Use Custom Mix — tick only your weak topics"],["18:30","19:30","meal","Dinner",null,"Dinner!"],["19:30","21:00","revision","Key Terms: Weak Topics","tr","Key terms for topics still shaky"]]],
+    ["18 May",[["09:30","11:00","revision","Full All Topics Quiz (Benchmark)","qz","See how far you have come since day one!"],["11:00","11:30","break","Break",null,"Short break!"],["11:30","13:00","revision","Read Back Shaky Summaries","sm","Focus on mechanisms and topic links"],["13:00","15:00","meal","Long Lunch — You Deserve It!",null,"Solid week of work. Relax!"],["15:00","16:30","revision","Custom Mix: Final Consolidation","fc","Tick any topics still needing work"],["16:30","21:00","free","Free Evening!",null,"You have earned it — go do something fun!"]]],
+    ["19 May",[["09:30","11:00","revision","All Summaries: Final Read","all","Relaxed pace — you know this stuff"],["11:00","11:30","break","Break",null,"Short break!"],["11:30","12:30","revision","Key Terms Final Scan","tr","Just the terms you are least confident on"],["12:30","21:00","rest","Rest of Day Off","null","Recharge. Get to bed at a reasonable time."]]],
+    ["20 May",[["09:30","11:00","revision","Read Back Shaky Summaries","sm","Focus on understanding, not memorising"],["11:00","11:30","break","Break",null,"Short break!"],["11:30","13:00","revision","Final Full Quiz","qz","Last full quiz — you should be flying now!"],["13:00","15:00","meal","Long Lunch — You Deserve It!",null,"You have done loads. Relax!"],["15:00","16:30","revision","Light Flashcard Review","fc","Relaxed All Topics run — no pressure"],["16:30","21:00","free","Free Evening!",null,"Take the whole evening off!"]]],
+    ["21 May",[["09:30","10:30","revision","Light Review (Day Before)","all","Skim All Summaries one last time"],["10:30","11:30","revision","Key Terms Quick Scan","tr","Just the ones you are least confident on"],["11:30","21:00","rest","Rest Day","null","Eat well, relax, early night. Sleep beats cramming!"]]],
+    ["22 May",[["09:00","12:00","exam","ECOSYSTEMS EXAM",null,"You have put in the work — go smash it!"]]]
+  ],
+  cli: [
+    ["23 May",[["09:30","11:00","revision","Read All Summaries (Part 1)","all","First 10 topics — big picture only"],["11:00","11:30","break","Break",null,"Fresh air!"],["11:30","13:00","revision","Read All Summaries (Part 2)","all","Remaining 9 topics"],["13:00","14:00","meal","Lunch",null,"Proper lunch!"],["14:00","16:00","revision","All Topics Quiz","qz","Find your weakest topics"],["16:00","17:00","break","Afternoon Break",null,"Rest!"],["17:00","18:30","revision","Key Terms: All Topics","tr","Note any you are not confident on"],["18:30","19:30","meal","Dinner",null,"Relax properly"],["19:30","21:00","revision","Flashcards: Weak Topics","fc","Focus on what you flagged"]]],
+    ["24 May",[["09:30","11:00","revision","GHGs, Radiation & Atmosphere Structure","fc","1.3.1, 2.1.2, 1.4.1 — summary, flashcards, quiz"],["11:00","11:30","break","Break",null,"Short break!"],["11:30","13:00","revision","Ocean Circulation & Mechanisms","fc","1.7.1 + 1.8.1 — summary, flashcards, quiz"],["13:00","14:00","meal","Lunch",null,"Proper lunch!"],["14:00","16:00","revision","Atmospheric Circulation & Forces/Ekman","fc","1.9.1 + 1.5.1 — summary, flashcards, quiz"],["16:00","17:00","break","Afternoon Break",null,"Rest!"],["17:00","18:30","revision","Predictions & Observed Changes","fc","1.10.1 + 1.11.1 — key numbers and mechanisms"],["18:30","19:30","meal","Dinner",null,"Dinner!"],["19:30","21:00","revision","Quiz: Physics & Circulation Topics","qz","Test yourself on today's topics"]]],
+    ["25 May",[["09:30","11:00","revision","Palaeoclimate & Measuring Past Climate","fc","2.1.1b + 2.2.1 — summary, flashcards, quiz"],["11:00","11:30","break","Break",null,"Short break!"],["11:30","13:00","revision","Cenozoic & Orbit and Ice Ages","fc","2.3.1 + 2.4.1 — key mechanisms and dates"],["13:00","14:00","meal","Lunch",null,"Proper lunch!"],["14:00","16:00","revision","Rapid Climate Change & Instability","fc","2.5.1 + 2.6.1 — D-O events, Heinrich, AMOC"],["16:00","17:00","break","Afternoon Break",null,"Rest!"],["17:00","18:30","revision","Holocene, Anthropogenic GHG & Civilisations","fc","2.7.1, 2.8.1, 2.9.1 — summaries + flashcards"],["18:30","19:30","meal","Dinner",null,"Dinner!"],["19:30","21:00","revision","Quiz: Palaeoclimate Topics","qz","Test yourself on today's topics"]]],
+    ["26 May",[["09:30","11:00","revision","Full Shuffle Flashcards","fc","All Topics — note any you stumble on"],["11:00","11:30","break","Break",null,"Short break!"],["11:30","13:00","revision","Full All Topics Quiz","qz","Benchmark yourself"],["13:00","15:00","meal","Long Lunch — You Deserve It!",null,"Big long lunch. Relax!"],["15:00","16:30","revision","Targeted Weak Topics","sm","Summaries for anything still shaky"],["16:30","21:00","free","Free Evening!",null,"Go do something fun — you have smashed it!"]]],
+    ["27 May",[["09:30","11:00","revision","Light Review (Day Before)","all","Skim All Summaries one last time"],["11:00","11:30","revision","Key Terms Quick Scan","tr","Just the ones you are least confident on"],["11:30","21:00","rest","Rest Day","null","Eat well, relax, early night. You have got this!"]]],
+    ["2 Jun",[["09:00","12:00","exam","CLIMATE SYSTEMS EXAM",null,"You have put in the work — go smash it!"]]]
+  ]
+};
+
+// ── TIMETABLE RENDERING ───────────────────────────────────────────────────────
+function ttItem(start, end, type, title, tab, desc, isNow, isNext) {
+  const typeIcon = {revision:'📖', break:'☕', meal:'🍽️', free:'🎉', exam:'🎓', rest:'😴'};
+  const goLabel = {fc:'→ Flashcards', qz:'→ Quiz', sm:'→ Summary', tr:'→ Key Terms', all:'→ All Summaries'};
+  const clickable = tab && tab !== 'null';
+  const cl = 'tt-item ' + type + (clickable ? ' clickable' : '');
+  const onclick = clickable ? ' onclick="jumpToTab(\'' + tab + '\')"' : '';
+  const timeStr = isNow ? '<span class="tt-now-dot"></span>' : start;
+  const label = isNow ? 'Now · ' + desc : isNext ? 'Up next · ' + desc : start + '–' + end + ' · ' + desc;
+  return '<div class="' + cl + '"' + onclick + '>' +
+    '<div class="tt-time">' + timeStr + '</div>' +
+    '<div class="tt-content">' +
+    '<div class="tt-title">' + typeIcon[type] + ' ' + title + '</div>' +
+    '<div class="tt-desc">' + label + '</div>' +
+    (clickable ? '<div class="tt-go">' + (goLabel[tab]||'') + '</div>' : '') +
+    '</div></div>';
+}
+
+function buildTimetable() {
+  const mod = currentModule;
+  const schedule = TIMETABLE[mod];
+  if (!schedule) return;
+
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-GB', {day:'numeric', month:'short'}).replace(/^0/, '');
+  const currentMins = now.getHours() * 60 + now.getMinutes();
+
+  // Build today section
+  const todayData = schedule.find(([d]) => d === todayStr);
+  const todaySection = document.getElementById('today-section');
+  if (todayData) {
+    const [, sessions] = todayData;
+    const currentSession = sessions.find(([s, e]) => {
+      const [sh, sm] = s.split(':').map(Number);
+      const [eh, em] = e.split(':').map(Number);
+      return currentMins >= sh*60+sm && currentMins < eh*60+em;
+    });
+    const nextSession = sessions.find(([s, e, type]) => {
+      const [sh, sm] = s.split(':').map(Number);
+      return currentMins < sh*60+sm && type !== 'break';
+    });
+    let todayHTML = '<div class="slbl">Today — ' + todayStr + '</div>';
+    if (currentSession) {
+      const [s, e, type, title, tab, desc] = currentSession;
+      todayHTML += ttItem(s, e, type, title, tab, desc, true, false);
+    }
+    if (nextSession) {
+      const [s, e, type, title, tab, desc] = nextSession;
+      todayHTML += ttItem(s, e, type, title, tab, desc, false, true);
+    }
+    if (!currentSession && !nextSession) {
+      todayHTML += '<div class="tt-item rest"><div class="tt-time">✓</div><div class="tt-content"><div class="tt-title">All done for today!</div><div class="tt-desc">Nice work. Relax.</div></div></div>';
+    }
+    todaySection.innerHTML = todayHTML;
+  } else {
+    todaySection.innerHTML = '';
+  }
+
+  // Build full schedule - skip past days
+  let html = '';
+
+  // Parse a schedule day string like "15 May" or "2 Jun" into a Date for comparison
+  function parseDayStr(str) {
+    return new Date(str + ' 2026');
+  }
+
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  schedule.forEach(([day, sessions]) => {
+    const dayDate = parseDayStr(day);
+    if (dayDate < todayMidnight) return; // skip past days
+    const isToday = day === todayStr;
+    html += '<div class="tt-section">';
+    html += '<div class="tt-day-hd ' + (isToday ? 'today-hd' : '') + '">' +
+      (isToday ? '<span class="tt-today-badge">TODAY</span> ' : '') + day + '</div>';
+    sessions.forEach(([s, e, type, title, tab, desc]) => {
+      html += ttItem(s, e, type, title, tab, desc, false, false);
+    });
+    html += '</div>';
+  });
+  document.getElementById('tt-body').innerHTML = html;
+
+  setTimeout(() => {
+    const todayHd = document.querySelector('.today-hd');
+    if (todayHd) todayHd.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 150);
+}
+
+function jumpToTab(tab) {
+  const map = {fc:2, qz:3, sm:4, tr:5, all:6};
+  const idx = map[tab];
+  if (!idx) return;
+  const btn = document.querySelector('.tabs button:nth-child(' + idx + ')');
+  if (btn) { goTab(tab, btn); }
+  if (tab === 'all') buildAllSummaries();
 }
 
 // ── KEYBOARD SHORTCUTS ────────────────────────────────────────────────────────
