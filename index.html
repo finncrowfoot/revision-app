@@ -116,6 +116,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .sm h4{font-size:12px;font-weight:700;color:var(--acc);margin:13px 0 3px;text-transform:uppercase;letter-spacing:.4px}
 .sm p{margin-bottom:6px}
 .tip{background:var(--amber-lt);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;padding:10px 12px;margin:10px 0;font-size:13px;line-height:1.5;color:var(--text)}
+.search-result{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:13px 14px;margin-bottom:8px}
+.search-term{font-size:14px;font-weight:700;color:var(--acc);margin-bottom:3px}
+.search-def{font-size:13px;color:var(--text);line-height:1.5;margin-bottom:4px}
+.search-topic{font-size:11px;font-weight:600;color:var(--muted);background:var(--bg);padding:2px 7px;border-radius:20px;display:inline-block}
+.search-highlight{background:var(--acc-lt);color:var(--acc-dk);border-radius:3px;padding:0 2px}
+.search-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px}
 .sum-acc{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden}
 .sum-acc-hd{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;list-style:none;user-select:none}
 .sum-acc-hd::-webkit-details-marker{display:none}
@@ -216,6 +222,7 @@ details[open] .sum-acc-arr{transform:rotate(90deg)}
     <button class="tab" onclick="goTab('sm',this)">Summary</button>
     <button class="tab" onclick="goTab('tr',this)">Key Terms</button>
     <button class="tab" onclick="goTab('all',this)">All Summaries</button>
+    <button class="tab" onclick="goTab('search',this)">🔍 Search</button>
   </div>
 
   <div id="s-home" class="scr on">
@@ -303,7 +310,21 @@ details[open] .sum-acc-arr{transform:rotate(90deg)}
     </div>
   </div>
 
-  <div id="s-all" class="scr">
+  <div id="s-search" class="scr">
+  <div style="position:sticky;top:0;background:var(--bg);padding-bottom:10px;z-index:10">
+    <div class="slbl" style="margin-top:0">Search Key Terms</div>
+    <div style="position:relative">
+      <input id="search-input" type="search" placeholder="Search terms, definitions..." 
+        style="width:100%;padding:12px 40px 12px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-size:15px;font-family:inherit;outline:none"
+        oninput="doSearch(this.value)" />
+      <span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+    </div>
+    <div id="search-meta" style="font-size:12px;color:var(--muted);margin-top:6px;min-height:16px"></div>
+  </div>
+  <div id="search-results"></div>
+</div>
+
+<div id="s-all" class="scr">
     <div class="slbl">All Topic Summaries</div>
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <button class="btn p" style="margin-bottom:0;font-size:13px;padding:10px" onclick="allExpand()">Expand all</button>
@@ -1656,11 +1677,13 @@ function goTab(name, btn) {
   document.getElementById('s-' + name).classList.add('on');
   btn.classList.add('on');
   if (name === 'all') buildAllSummaries();
+  if (name === 'search') { initSearch(); setTimeout(() => document.getElementById('search-input').focus(), 100); }
 }
 
 function bk(mode) {
   const cfg = {
     fc: [['fc-pick',''],['fc-sess','none'],['fc-mix','none']],
+    search: [],
     qz: [['qz-pick',''],['qz-sess','none'],['qz-res','none']],
     sm: [['sm-pick',''],['sm-sess','none']],
     tr: [['tr-pick',''],['tr-sess','none']]
@@ -2081,6 +2104,59 @@ function jumpToTab(tab) {
   const btn = document.querySelector('.tabs button:nth-child(' + idx + ')');
   if (btn) { goTab(tab, btn); }
   if (tab === 'all') buildAllSummaries();
+}
+
+// ── SEARCH ───────────────────────────────────────────────────────────────────
+function doSearch(query) {
+  const results = document.getElementById('search-results');
+  const meta = document.getElementById('search-meta');
+  const q = query.trim().toLowerCase();
+
+  if (!q) {
+    results.innerHTML = '<div class="search-empty">Start typing to search across all key terms in this module.</div>';
+    meta.textContent = '';
+    return;
+  }
+
+  // Search all terms in all topics
+  const matches = [];
+  TOPICS.forEach(t => {
+    const d = DATA[t.id];
+    if (!d || !d.terms) return;
+    d.terms.forEach(term => {
+      const termLower = term.t.toLowerCase();
+      const defLower = term.d.toLowerCase();
+      if (termLower.includes(q) || defLower.includes(q)) {
+        matches.push({ term: term.t, def: term.d, topicId: t.id, topicName: t.name, topicIco: t.ico });
+      }
+    });
+  });
+
+  meta.textContent = matches.length === 0 ? 'No results' : matches.length + ' result' + (matches.length > 1 ? 's' : '') + ' found';
+
+  if (matches.length === 0) {
+    results.innerHTML = '<div class="search-empty">No terms found for "' + query + '".<br>Try a shorter or different search.</div>';
+    return;
+  }
+
+  function highlight(text, q) {
+    const idx = text.toLowerCase().indexOf(q);
+    if (idx === -1) return text;
+    return text.slice(0, idx) + '<span class="search-highlight">' + text.slice(idx, idx + q.length) + '</span>' + highlight(text.slice(idx + q.length), q);
+  }
+
+  results.innerHTML = matches.map(m =>
+    '<div class="search-result">' +
+    '<div class="search-term">' + highlight(m.term, q) + '</div>' +
+    '<div class="search-def">' + highlight(m.def, q) + '</div>' +
+    '<span class="search-topic">' + m.topicIco + ' ' + m.topicId + ' ' + m.topicName + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+function initSearch() {
+  const input = document.getElementById('search-input');
+  if (input) { input.value = ''; doSearch(''); }
 }
 
 // ── KEYBOARD SHORTCUTS ────────────────────────────────────────────────────────
