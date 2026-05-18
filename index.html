@@ -227,9 +227,9 @@ details[open] .sum-acc-arr{transform:rotate(90deg)}
 
   <div id="s-home" class="scr on">
     <div class="cd" id="home-cd">
-      <div class="days" id="dcount">—</div>
-      <div class="lbl">days until your exam</div>
-      <div class="dt" id="exam-dt"></div>
+      <div id="menace-msg" style="font-size:22px;font-weight:800;line-height:1.2;margin-bottom:8px"></div>
+      <div id="menace-time" style="font-size:13px;opacity:0.9;font-weight:600;letter-spacing:0.3px"></div>
+      <div class="dt" id="exam-dt" style="margin-top:6px"></div>
     </div>
     <div id="today-section" style="margin-bottom:6px"></div>
     <div class="slbl">Revision Schedule</div>
@@ -1650,11 +1650,63 @@ function resetApp() {
 }
 
 // ── COUNTDOWN ─────────────────────────────────────────────────────────────────
+const MENACING_MSGS = [
+  ["The exam is watching you.", "It has always been watching."],
+  ["Your lecturer is sharpening their red pen.", "Sleep well."],
+  ["Every minute you waste, it gets closer.", "It does not sleep."],
+  ["The exam does not care about your feelings.", "Nor does the mark scheme."],
+  ["You thought you had more time.", "You were wrong."],
+  ["The exam has been ready since day one.", "Have you?"],
+  ["It lurks. It waits. It marks.", "Mostly it marks."],
+  ["Somewhere, a mark scheme exists.", "It is not on your side."],
+  ["The clock is not your friend.", "Neither is procrastination."],
+  ["Tick. Tock.", "That is the sound of your grade deciding its fate."],
+  ["The exam has no mercy.", "It has a rubric though."],
+  ["Days are numbered.", "So are the marks you might lose."],
+  ["You can run. You cannot hide.", "Also the exam is on Thursday."],
+  ["The invigilator will say begin.", "Will you be ready?"],
+  ["Carbon cycling does not care about your Netflix queue.", "Neither does the exam."]
+];
+
 function calcDays() {
   if (!currentModule) return;
-  const d = Math.ceil((new Date(MODULES[currentModule].examDate) - new Date()) / 86400000);
-  document.getElementById('dcount').textContent = d > 0 ? d : '0';
+  const examDate = new Date(MODULES[currentModule].examDate);
+  const now = new Date();
+  const diffMs = examDate - now;
+  
+  const msgEl = document.getElementById('menace-msg');
+  const timeEl = document.getElementById('menace-time');
+  if (!msgEl || !timeEl) return;
+
+  if (diffMs <= 0) {
+    msgEl.textContent = "It is here.";
+    timeEl.textContent = "Good luck. You have got this. 🌿";
+    return;
+  }
+
+  const days = Math.floor(diffMs / 86400000);
+  const hours = Math.floor((diffMs % 86400000) / 3600000);
+  const mins = Math.floor((diffMs % 3600000) / 60000);
+  const secs = Math.floor((diffMs % 60000) / 1000);
+
+  // Pick message based on days remaining
+  const idx = Math.min(Math.floor((14 - Math.min(days, 14)) / 1), MENACING_MSGS.length - 1);
+  const pair = MENACING_MSGS[Math.max(0, idx)];
+
+  if (days > 1) {
+    msgEl.innerHTML = pair[0] + '<br><span style="font-size:16px;opacity:0.85">' + pair[1] + '</span>';
+    timeEl.textContent = days + 'd ' + hours + 'h ' + mins + 'm ' + secs + 's remaining.';
+  } else if (days === 1) {
+    msgEl.innerHTML = 'Tomorrow.<br><span style="font-size:16px;opacity:0.85">It is literally tomorrow.</span>';
+    timeEl.textContent = hours + 'h ' + mins + 'm ' + secs + 's remaining.';
+  } else {
+    msgEl.innerHTML = 'TODAY.<br><span style="font-size:16px;opacity:0.85">No more time. Only exam.</span>';
+    timeEl.textContent = hours + 'h ' + mins + 'm ' + secs + 's remaining.';
+  }
 }
+
+// Tick every second
+setInterval(() => { if (currentModule) calcDays(); }, 1000);
 
 // ── GRIDS ─────────────────────────────────────────────────────────────────────
 function buildGrids() {
