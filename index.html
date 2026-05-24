@@ -271,7 +271,22 @@ details[open] .sum-acc-arr{transform:rotate(90deg)}
   </div>
 
   <div id="s-qz" class="scr">
-    <div id="qz-pick"><div class="slbl">Quiz — pick a topic</div><div class="grid" id="g-qz"></div><button class="btn p all-btn" onclick="qzStart('ALL')">🔀 All Topics (shuffle everything)</button></div>
+    <div id="qz-pick">
+      <div class="slbl">Quiz — pick a topic</div>
+      <div class="grid" id="g-qz"></div>
+      <button class="btn p all-btn" onclick="qzStart('ALL')">🔀 All Topics (shuffle everything)</button>
+      <button class="btn all-btn" style="border-color:var(--acc);color:var(--acc)" onclick="showQzMixPicker()">🎛️ Custom Mix (choose topics)</button>
+    </div>
+    <div id="qz-mix" style="display:none">
+      <button class="back" onclick="hideQzMixPicker()">← Back</button>
+      <div class="slbl">Select topics to include</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn p" style="margin-bottom:0;font-size:13px;padding:10px" onclick="qzMixSelectAll()">Select all</button>
+        <button class="btn" style="margin-bottom:0;font-size:13px;padding:10px" onclick="qzMixSelectNone()">Clear all</button>
+      </div>
+      <div id="qz-mix-grid"></div>
+      <button class="btn p" style="margin-top:4px" onclick="startQzMix()" id="qz-mix-start-btn">🔀 Start Custom Quiz</button>
+    </div>
     <div id="qz-sess" style="display:none">
       <button class="back" onclick="bk('qz')">← Back</button>
       <div class="plbl" id="qz-pl">Q 1 of 5</div>
@@ -1597,7 +1612,7 @@ function bk(mode) {
   const cfg = {
     fc: [['fc-pick',''],['fc-sess','none'],['fc-mix','none']],
     search: [],
-    qz: [['qz-pick',''],['qz-sess','none'],['qz-res','none']],
+    qz: [['qz-pick',''],['qz-sess','none'],['qz-res','none'],['qz-mix','none']],
     sm: [['sm-pick',''],['sm-sess','none']],
     tr: [['tr-pick',''],['tr-sess','none']]
   };
@@ -1736,6 +1751,9 @@ function qzRetry() {
   qzIdx = 0; qzScore = 0;
   if (curTopic === 'ALL') {
     const all = TOPICS.flatMap(t => DATA[t.id] ? DATA[t.id].quiz : []);
+    qzQs = all.sort(() => Math.random() - 0.5);
+  } else if (curTopic === 'MIX') {
+    const all = [...qzMixSelected].flatMap(id => DATA[id] ? DATA[id].quiz : []);
     qzQs = all.sort(() => Math.random() - 0.5);
   } else {
     qzQs = [...DATA[curTopic].quiz].sort(() => Math.random() - 0.5);
@@ -2070,6 +2088,86 @@ function doSearch(query) {
 function initSearch() {
   const input = document.getElementById('search-input');
   if (input) { input.value = ''; doSearch(''); }
+}
+
+// ── QUIZ CUSTOM MIX ──────────────────────────────────────────────────────────
+let qzMixSelected = new Set();
+
+function showQzMixPicker() {
+  document.getElementById('qz-pick').style.display = 'none';
+  document.getElementById('qz-mix').style.display = '';
+  buildQzMixGrid();
+}
+
+function hideQzMixPicker() {
+  document.getElementById('qz-mix').style.display = 'none';
+  document.getElementById('qz-pick').style.display = '';
+  qzMixSelected.clear();
+}
+
+function buildQzMixGrid() {
+  qzMixSelected.clear();
+  const g = document.getElementById('qz-mix-grid');
+  g.innerHTML = '<div class="grid">' + TOPICS.map(t => `
+    <button class="mix-topic" id="qzmix-${t.id}" onclick="toggleQzMix('${t.id}')">
+      <div class="mt-check">☐</div>
+      <div class="mt-num">${t.id}</div>
+      <div class="mt-name">${t.name}</div>
+    </button>`).join('') + '</div>';
+  updateQzMixBtn();
+}
+
+function toggleQzMix(id) {
+  const btn = document.getElementById('qzmix-' + id);
+  if (qzMixSelected.has(id)) {
+    qzMixSelected.delete(id);
+    btn.classList.remove('selected');
+    btn.querySelector('.mt-check').textContent = '☐';
+  } else {
+    qzMixSelected.add(id);
+    btn.classList.add('selected');
+    btn.querySelector('.mt-check').textContent = '☑';
+  }
+  updateQzMixBtn();
+}
+
+function qzMixSelectAll() {
+  TOPICS.forEach(t => {
+    qzMixSelected.add(t.id);
+    const btn = document.getElementById('qzmix-' + t.id);
+    if (btn) { btn.classList.add('selected'); btn.querySelector('.mt-check').textContent = '☑'; }
+  });
+  updateQzMixBtn();
+}
+
+function qzMixSelectNone() {
+  TOPICS.forEach(t => {
+    qzMixSelected.delete(t.id);
+    const btn = document.getElementById('qzmix-' + t.id);
+    if (btn) { btn.classList.remove('selected'); btn.querySelector('.mt-check').textContent = '☐'; }
+  });
+  updateQzMixBtn();
+}
+
+function updateQzMixBtn() {
+  const btn = document.getElementById('qz-mix-start-btn');
+  const n = qzMixSelected.size;
+  const total = [...qzMixSelected].reduce((sum, id) => sum + (DATA[id] ? DATA[id].quiz.length : 0), 0);
+  btn.textContent = n === 0 ? '🎛️ Select at least one topic' : `🔀 Start Quiz (${n} topic${n > 1 ? 's' : ''}, ${total} questions)`;
+  btn.disabled = n === 0;
+  btn.style.opacity = n === 0 ? '0.5' : '1';
+}
+
+function startQzMix() {
+  if (qzMixSelected.size === 0) return;
+  const all = [...qzMixSelected].flatMap(id => DATA[id] ? DATA[id].quiz : []);
+  qzQs = all.sort(() => Math.random() - 0.5);
+  curTopic = 'MIX';
+  qzIdx = 0; qzScore = 0;
+  document.getElementById('qz-mix').style.display = 'none';
+  document.getElementById('qz-res').style.display = 'none';
+  document.getElementById('qz-sess').style.display = '';
+  renderQz();
 }
 
 // ── KEYBOARD SHORTCUTS ────────────────────────────────────────────────────────
