@@ -289,9 +289,10 @@ details[open] .sum-acc-arr{transform:rotate(90deg)}
     </div>
     <div id="qz-sess" style="display:none">
       <button class="back" onclick="bk('qz')">← Back</button>
-      <div class="plbl" id="qz-pl">Q 1 of 5</div>
+      <div class="plbl" id="qz-pl">Q 1 of 5 · 0%</div>
       <div class="pbar"><div class="pfill" id="qz-pf" style="width:0%"></div></div>
       <div id="qz-body"></div>
+      <button class="btn p" id="qz-next" onclick="qzNext()" style="display:none;margin-top:10px">Next →</button>
     </div>
     <div id="qz-res" style="display:none">
       <div class="card" style="text-align:center;padding:24px">
@@ -1710,8 +1711,9 @@ function qzStart(id) {
 function renderQz() {
   const q = qzQs[qzIdx];
   const pct = Math.round(qzIdx / qzQs.length * 100);
-  document.getElementById('qz-pl').textContent = 'Q ' + (qzIdx+1) + ' of ' + qzQs.length;
+  document.getElementById('qz-pl').textContent = 'Q ' + (qzIdx+1) + ' of ' + qzQs.length + ' · ' + pct + '%';
   document.getElementById('qz-pf').style.width = pct + '%';
+  document.getElementById('qz-next').style.display = 'none';
   document.getElementById('qz-body').innerHTML =
     '<div class="card">' +
     '<div class="qq">' + q.q + '</div>' +
@@ -1731,7 +1733,13 @@ function qzAns(chosen) {
   fb.style.display = 'block';
   fb.className = 'fb ' + (ok ? 'ok' : 'bad');
   fb.textContent = (ok ? '✓ Correct! ' : '✗ Incorrect. ') + q.exp;
-  setTimeout(() => { qzIdx++; qzIdx < qzQs.length ? renderQz() : showRes(); }, 2300);
+  document.getElementById('qz-next').style.display = '';
+  document.getElementById('qz-next').focus();
+}
+
+function qzNext() {
+  qzIdx++;
+  qzIdx < qzQs.length ? renderQz() : showRes();
 }
 
 function showRes() {
@@ -2173,6 +2181,12 @@ function startQzMix() {
 // ── KEYBOARD SHORTCUTS ────────────────────────────────────────────────────────
 document.addEventListener('keydown', function(e) {
   const fcVisible = document.getElementById('fc-sess').style.display !== 'none';
+  const qzNextVisible = document.getElementById('qz-next') && document.getElementById('qz-next').style.display !== 'none';
+  if (e.code === 'Space' && qzNextVisible) {
+    e.preventDefault();
+    qzNext();
+    return;
+  }
   if (!fcVisible) return;
   if (e.code === 'Space') {
     e.preventDefault();
