@@ -299,7 +299,8 @@ details[open] .sum-acc-arr{transform:rotate(90deg)}
         <div class="scr-c" id="sc"><div class="scr-n" id="sc-n"></div><div class="scr-l">score</div></div>
         <div style="font-size:16px;font-weight:700" id="sc-msg"></div>
       </div>
-      <button class="btn p" onclick="qzRetry()">Try again</button>
+      <div id="qz-breakdown"></div>
+      <button class="btn p" onclick="qzRetry()" style="margin-top:8px">Try again</button>
       <button class="btn" onclick="bk('qz')">Change topic</button>
     </div>
   </div>
@@ -1697,7 +1698,7 @@ function fcNext() {
 function qzStart(id) {
   curTopic = id; qzIdx = 0; qzScore = 0;
   if (id === 'ALL') {
-    const all = TOPICS.flatMap(t => DATA[t.id] ? DATA[t.id].quiz : []);
+    const all = TOPICS.flatMap(t => DATA[t.id] ? DATA[t.id].quiz.map(q => ({...q, _topic: t.id, _topicName: t.name})) : []);
     qzQs = all.sort(() => Math.random() - 0.5);
   } else {
     qzQs = [...DATA[id].quiz].sort(() => Math.random() - 0.5);
@@ -1727,6 +1728,7 @@ function qzAns(chosen) {
   document.querySelectorAll('.opt').forEach(o => o.disabled = true);
   const ok = chosen === q.ans;
   if (ok) qzScore++;
+  qzQs[qzIdx]._result = ok;
   document.querySelectorAll('.opt')[q.ans].classList.add('ok');
   if (!ok) document.querySelectorAll('.opt')[chosen].classList.add('bad');
   const fb = document.getElementById('qz-fb');
@@ -1753,12 +1755,101 @@ function showRes() {
   else { sc.style.background = 'var(--red-lt)'; n.style.color = '#DC2626'; }
   n.textContent = qzScore + '/' + qzQs.length;
   document.getElementById('sc-msg').textContent = ['Keep at it! 📚','Getting there! 💪','Good effort! 👍','Well done! ⭐','Excellent! 🏆'][Math.min(4,Math.floor(pct/20))];
+
+  // Build topic breakdown for ALL and MIX quizzes
+  const breakdown = document.getElementById('qz-breakdown');
+  const hasTopics = qzQs.some(q => q._topic);
+  if (!hasTopics) { breakdown.innerHTML = ''; return; }
+
+  // Tally per topic
+  const topicStats = {};
+  qzQs.forEach(q => {
+    if (!q._topic) return;
+    if (!topicStats[q._topic]) topicStats[q._topic] = { name: q._topicName, right: 0, total: 0 };
+    topicStats[q._topic].total++;
+    if (q._result) topicStats[q._topic].right++;
+  });
+
+  const weak = [], mid = [], strong = [];
+  Object.entries(topicStats).forEach(([id, s]) => {
+    const p = s.total > 0 ? Math.round(s.right / s.total * 100) : 0;
+    s.pct = p; s.id = id;
+    if (p < 50) weak.push(s);
+    else if (p < 75) mid.push(s);
+    else strong.push(s);
+  });
+
+  // Sort each group worst-first
+  weak.sort((a,b) => a.pct - b.pct);
+  mid.sort((a,b) => a.pct - b.pct);
+  strong.sort((a,b) => a.pct - b.pct);
+
+  function topicRow(s) {
+    const col = s.pct < 50 ? '#DC2626' : s.pct < 75 ? '#D97706' : 'var(--acc)';
+    const bg = s.pct < 50 ? 'var(--red-lt)' : s.pct < 75 ? 'var(--amber-lt)' : 'var(--acc-lt)';
+    const bar = Math.round(s.pct / 100 * 80);
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + s.id + ' ' + s.name + '</div>' +
+        '<div style="background:var(--border);border-radius:3px;height:5px;margin-top:3px">' +
+          '<div style="width:' + bar + '%;height:100%;background:' + col + ';border-radius:3px"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:12px;font-weight:700;color:' + col + ';background:' + bg + ';padding:2px 7px;border-radius:12px;white-space:nowrap">' + s.right + '/' + s.total + ' (' + s.pct + '%)</div>' +
+    '</div>';
+  }
+
+  let html = '<div style="margin-top:16px">';
+  html += '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Topic Breakdown</div>';
+
+  if (weak.length) {
+    html += '<div style="font-size:12px;font-weight:700;color:#DC2626;margin:10px 0 4px">🔴 Needs work (below 50%)</div>';
+    weak.forEach(s => { html += topicRow(s); });
+  }
+  if (mid.length) {
+    html += '<div style="font-size:12px;font-weight:700;color:#D97706;margin:10px 0 4px">🟡 Getting there (50–75%)</div>';
+    mid.forEach(s => { html += topicRow(s); });
+  }
+  if (strong.length) {
+    html += '<div style="font-size:12px;font-weight:700;color:var(--acc);margin:10px 0 4px">🟢 Strong (above 75%)</div>';
+    strong.forEach(s => { html += topicRow(s); });
+  }
+
+  // Focus plan
+  html += '<div style="margin-top:14px;background:var(--bg);border-radius:10px;padding:12px">';
+  html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">📋 Focus plan</div>';
+  if (weak.length) {
+    html += '<div style="font-size:12px;color:var(--text);margin-bottom:4px">🔴 <strong>Revise first:</strong> ' + weak.map(s => s.id).join(', ') + '</div>';
+  }
+  if (mid.length) {
+    html += '<div style="font-size:12px;color:var(--text);margin-bottom:4px">🟡 <strong>Worth another pass:</strong> ' + mid.map(s => s.id).join(', ') + '</div>';
+  }
+  if (strong.length) {
+    html += '<div style="font-size:12px;color:var(--text)">🟢 <strong>Looking good:</strong> ' + strong.map(s => s.id).join(', ') + '</div>';
+  }
+  html += '</div>';
+
+  // Targeted quiz button for weak + mid topics
+  const targetIds = [...weak, ...mid].map(s => s.id);
+  if (targetIds.length > 0) {
+    html += '<button class="btn p" style="margin-top:12px" onclick="launchTargetedQuiz(' + JSON.stringify(targetIds) + ')">🎯 Quiz me on weak topics (' + targetIds.length + ' topics)</button>';
+  } else {
+    html += '<div style="text-align:center;padding:10px;font-size:13px;color:var(--acc);font-weight:600">🏆 Excellent — all topics strong!</div>';
+  }
+
+  html += '</div>';
+  breakdown.innerHTML = html;
+}
+
+function launchTargetedQuiz(topicIds) {
+  qzMixSelected = new Set(topicIds);
+  startQzMix();
 }
 
 function qzRetry() {
   qzIdx = 0; qzScore = 0;
   if (curTopic === 'ALL') {
-    const all = TOPICS.flatMap(t => DATA[t.id] ? DATA[t.id].quiz : []);
+    const all = TOPICS.flatMap(t => DATA[t.id] ? DATA[t.id].quiz.map(q => ({...q, _topic: t.id, _topicName: t.name})) : []);
     qzQs = all.sort(() => Math.random() - 0.5);
   } else if (curTopic === 'MIX') {
     const all = [...qzMixSelected].flatMap(id => DATA[id] ? DATA[id].quiz : []);
@@ -2168,7 +2259,10 @@ function updateQzMixBtn() {
 
 function startQzMix() {
   if (qzMixSelected.size === 0) return;
-  const all = [...qzMixSelected].flatMap(id => DATA[id] ? DATA[id].quiz : []);
+  const all = [...qzMixSelected].flatMap(id => {
+    const t = TOPICS.find(t => t.id === id);
+    return DATA[id] ? DATA[id].quiz.map(q => ({...q, _topic: id, _topicName: t ? t.name : id})) : [];
+  });
   qzQs = all.sort(() => Math.random() - 0.5);
   curTopic = 'MIX';
   qzIdx = 0; qzScore = 0;
